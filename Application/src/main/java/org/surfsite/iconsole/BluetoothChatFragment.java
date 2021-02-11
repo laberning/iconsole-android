@@ -28,10 +28,14 @@ import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.Message;
-import android.support.annotation.Nullable;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentActivity;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
+
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -43,6 +47,8 @@ import android.widget.Button;
 import android.widget.NumberPicker;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import java.lang.ref.WeakReference;
 
 /**
  * This fragment controls Bluetooth to communicate with other devices.
@@ -74,11 +80,6 @@ public class BluetoothChatFragment extends Fragment {
     private String mConnectedDeviceName = null;
 
     /**
-     * Array adapter for the conversation thread
-     private ArrayAdapter<String> mConversationArrayAdapter;
-     */
-
-    /**
      * Local Bluetooth adapter
      */
     private BluetoothAdapter mBluetoothAdapter = null;
@@ -89,40 +90,49 @@ public class BluetoothChatFragment extends Fragment {
     private BluetoothChatService mChatService = null;
     private boolean mIsBound;
     private ChannelService.ChannelServiceComm mChannelService;
+
     /**
      * The Handler that gets information back from the BluetoothChatService
      */
-    private final Handler mHandler = new Handler() {
+    private static class MessageHandler extends Handler {
+        private final WeakReference<BluetoothChatFragment> bluetoothChatFragmentWeakReference;
+
+        public MessageHandler(@NonNull Looper looper, BluetoothChatFragment bluetoothChatFragmentInstance) {
+            super(looper);
+            bluetoothChatFragmentWeakReference = new WeakReference<>(bluetoothChatFragmentInstance);
+        }
+
         @SuppressLint("DefaultLocale")
         @Override
         public void handleMessage(Message msg) {
-            FragmentActivity activity = getActivity();
+            BluetoothChatFragment bluetoothChatFragment = bluetoothChatFragmentWeakReference.get();
+            FragmentActivity activity = bluetoothChatFragment.getActivity();
             switch (msg.what) {
                 case Constants.MESSAGE_STATE_CHANGE:
                     switch (msg.arg1) {
                         case BluetoothChatService.STATE_CONNECTED:
-                            setStatus(getString(R.string.title_connected_to, mConnectedDeviceName));
+                            bluetoothChatFragment.setStatus(bluetoothChatFragment.getString(R.string.title_connected_to, bluetoothChatFragment.mConnectedDeviceName));
                             //mConversationArrayAdapter.clear();
-                            mStartButton.setEnabled(true);
-                            mStopButton.setEnabled(true);
-                            mDisconnectButton.setEnabled(true);
-                            mLevel.setEnabled(true);
-                            mLevel.setValue(1);
+                            bluetoothChatFragment.mStartButton.setEnabled(true);
+                            bluetoothChatFragment.mStopButton.setEnabled(true);
+                            bluetoothChatFragment.mDisconnectButton.setEnabled(true);
+                            bluetoothChatFragment.mLevel.setEnabled(true);
+                            bluetoothChatFragment.mLevel.setValue(1);
                             break;
                         case BluetoothChatService.STATE_CONNECTING:
-                            setStatus(R.string.title_connecting);
-                            mStartButton.setEnabled(false);
-                            mStopButton.setEnabled(false);
-                            mDisconnectButton.setEnabled(false);
-                            mLevel.setEnabled(false);
+                            bluetoothChatFragment.setStatus(R.string.title_connecting);
+                            bluetoothChatFragment.mStartButton.setEnabled(false);
+                            bluetoothChatFragment.mStopButton.setEnabled(false);
+                            bluetoothChatFragment.mDisconnectButton.setEnabled(false);
+                            bluetoothChatFragment.mLevel.setEnabled(false);
                             break;
                         case BluetoothChatService.STATE_LISTEN:
                         case BluetoothChatService.STATE_NONE:
-                            setStatus(R.string.title_not_connected);
-                            mStartButton.setEnabled(false);
-                            mStopButton.setEnabled(false);
-                            mDisconnectButton.setEnabled(false);
-                            mLevel.setEnabled(false);
+                            bluetoothChatFragment.setStatus(R.string.title_not_connected);
+                            bluetoothChatFragment.mStartButton.setEnabled(false);
+                            bluetoothChatFragment.mStopButton.setEnabled(false);
+                            bluetoothChatFragment.mDisconnectButton.setEnabled(false);
+                            bluetoothChatFragment.mLevel.setEnabled(false);
                             break;
                     }
                     break;
@@ -130,17 +140,17 @@ public class BluetoothChatFragment extends Fragment {
                     if (!(msg.obj instanceof IConsole.Data))
                         return;
                     IConsole.Data data = (IConsole.Data) msg.obj;
-                    mChannelService.setSpeed(data.mSpeed10 / 10.0);
-                    mChannelService.setPower(data.mPower10 / 10);
-                    mChannelService.setCadence(data.mRPM);
+                    bluetoothChatFragment.mChannelService.setSpeed(data.mSpeed10 / 10.0);
+                    bluetoothChatFragment.mChannelService.setPower(data.mPower10 / 10);
+                    bluetoothChatFragment.mChannelService.setCadence(data.mRPM);
 
-                    mSpeedText.setText(String.format("% 3.1f", data.mSpeed10 / 10.0));
-                    mPowerText.setText(String.format("% 3.1f", data.mPower10 / 10.0));
-                    mRPMText.setText(String.format("%d", data.mRPM));
-                    mDistanceText.setText(String.format("% 3.1f", data.mDistance10 / 10.0));
-                    mCaloriesText.setText(String.format("% 3d", data.mCalories));
-                    mHFText.setText(String.format("%d", data.mHF));
-                    mTimeText.setText(String.format("%s", data.getTimeStr()));
+                    bluetoothChatFragment.mSpeedText.setText(String.format("% 3.1f", data.mSpeed10 / 10.0));
+                    bluetoothChatFragment.mPowerText.setText(String.format("% 3.1f", data.mPower10 / 10.0));
+                    bluetoothChatFragment.mRPMText.setText(String.format("%d", data.mRPM));
+                    bluetoothChatFragment.mDistanceText.setText(String.format("% 3.1f", data.mDistance10 / 10.0));
+                    bluetoothChatFragment.mCaloriesText.setText(String.format("% 3d", data.mCalories));
+                    bluetoothChatFragment.mHFText.setText(String.format("%d", data.mHF));
+                    bluetoothChatFragment.mTimeText.setText(String.format("%s", data.getTimeStr()));
                     //mLevel.setValue(data.mLevel);
                     break;
                 case Constants.MESSAGE_WRITE:
@@ -157,10 +167,10 @@ public class BluetoothChatFragment extends Fragment {
                     break;
                 case Constants.MESSAGE_DEVICE_NAME:
                     // save the connected device's name
-                    mConnectedDeviceName = msg.getData().getString(Constants.DEVICE_NAME);
+                    bluetoothChatFragment.mConnectedDeviceName = msg.getData().getString(Constants.DEVICE_NAME);
                     if (null != activity) {
                         Toast.makeText(activity, "Connected to "
-                                + mConnectedDeviceName, Toast.LENGTH_SHORT).show();
+                                + bluetoothChatFragment.mConnectedDeviceName, Toast.LENGTH_SHORT).show();
                     }
                     break;
                 case Constants.MESSAGE_TOAST:
@@ -171,9 +181,14 @@ public class BluetoothChatFragment extends Fragment {
                     break;
             }
         }
-    };
+    }
+
+    public MessageHandler getMessageHandler() {
+        return new MessageHandler(Looper.myLooper(), this);
+    }
+
     private boolean mChannelServiceBound = false;
-    private ServiceConnection mConnection = new ServiceConnection() {
+    private final ServiceConnection mConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder service) {
             // This is called when the connection with the service has been
             // established, giving us the service object we can use to
@@ -181,7 +196,7 @@ public class BluetoothChatFragment extends Fragment {
             // service that we know is running in our own process, we can
             // cast its IBinder to a concrete class and directly access it.
             mChatService = ((BluetoothChatService.BluetoothChatServiceI) service).getService();
-            ((BluetoothChatService.BluetoothChatServiceI) service).setHandler(mHandler);
+            ((BluetoothChatService.BluetoothChatServiceI) service).setHandler(getMessageHandler());
             Log.d(TAG, "onServiceConnected()");
         }
 
@@ -358,46 +373,34 @@ public class BluetoothChatFragment extends Fragment {
         if (!mIsBound)
             doBindService();
 
-        mStartButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                mLevel.setValue(1);
-                if (mChatService != null)
-                    mChatService.startIConsole();
-            }
+        mStartButton.setOnClickListener(v -> {
+            mLevel.setValue(1);
+            if (mChatService != null)
+                mChatService.startIConsole();
         });
 
-        mStopButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                mLevel.setValue(1);
-                if (mChatService != null)
-                    mChatService.stopIConsole();
-            }
+        mStopButton.setOnClickListener(v -> {
+            mLevel.setValue(1);
+            if (mChatService != null)
+                mChatService.stopIConsole();
         });
 
-        mDisconnectButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                mLevel.setValue(1);
-                if (mChatService != null)
-                    mChatService.stopBT();
-            }
+        mDisconnectButton.setOnClickListener(v -> {
+            mLevel.setValue(1);
+            if (mChatService != null)
+                mChatService.stopBT();
         });
 
         mStartButton.setEnabled(false);
         mStopButton.setEnabled(false);
         mDisconnectButton.setEnabled(false);
         mLevel.setEnabled(false);
-        mLevel.setOnValueChangedListener(new NumberPicker.OnValueChangeListener() {
-            @Override
-            public void onValueChange(NumberPicker p, int oldval, int newval) {
-                //Log.e(TAG, "setLevel");
-                if (mChatService != null) {
-                    if (!mChatService.setLevel(newval))
-                        Log.e(TAG, "setLevel failed");
+        mLevel.setOnValueChangedListener((p, oldval, newval) -> {
+            //Log.e(TAG, "setLevel");
+            if (mChatService != null) {
+                if (!mChatService.setLevel(newval))
+                    Log.e(TAG, "setLevel failed");
 
-                }
             }
         });
     }
